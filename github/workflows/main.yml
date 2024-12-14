@@ -1,0 +1,31 @@
+name: Run Video Workflow
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 0 * * *' # todos los días a medianoche, por ejemplo
+
+jobs:
+  run-workflow:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v2
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+
+      - name: Install dependencies
+        run: |
+          pip install -r src/requirements.txt
+
+      - name: Setup Google credentials
+        # Supone que 'GCP_CREDENTIALS' es un secret con el JSON de la service account
+        run: |
+          echo "$GCP_CREDENTIALS" > credentials.json
+
+      - name: Run main script
+        run: |
+          python src/main.py
