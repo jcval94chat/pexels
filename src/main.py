@@ -7,15 +7,15 @@ from py_pexels import PyPexels
 from google_drive import get_latest_doc_words, upload_files_to_drive
 from email_notify import send_email
 
-# Cargar API key de Pexels de un secret o variable de entorno
-API_KEY = os.environ.get("PEXELS_API_KEY", "TU_API_KEY")
+# Cargar secretos desde variables de entorno
+DRIVE_FOLDER_ID = os.environ.get("DRIVE_FOLDER_ID")  # ID de la carpeta de Drive
+RECIPIENT_EMAIL = os.environ.get("RECIPIENT_EMAIL")  # Email del destinatario
+API_KEY = os.environ.get("PEXELS_API_KEY")  # API key de Pexels
 
-# Carpetas y archivos
+# Archivos locales para mantener el historial
 KEYWORDS_DICT_FILE = 'keywords_dict.json'
 USED_KEYWORDS_FILE = 'used_keywords.txt'
-CREDENTIALS_FILE = 'credentials.json'  # Descargado en el workflow
-DRIVE_FOLDER_ID = 'TU_FOLDER_ID_EN_DRIVE'  # Donde subirás los videos
-RECIPIENT_EMAIL = 'abc@gmail.com'
+CREDENTIALS_FILE = 'credentials.json'  # Descargado desde el secreto GCP_CREDENTIALS
 
 def load_keywords_dict():
     if os.path.exists(KEYWORDS_DICT_FILE):
