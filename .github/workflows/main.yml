@@ -8,6 +8,9 @@ on:
     - cron: '0 0 * * 6'
     - cron: '0 0 * * 0'
 
+permissions:
+  contents: write  # Otorgar permisos de escritura al repositorio para el GITHUB_TOKEN
+
 jobs:
   run-workflow:
     runs-on: ubuntu-latest
