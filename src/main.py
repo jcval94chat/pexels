@@ -49,7 +49,15 @@ KEYWORDS_DICT_FILE = 'keywords_dict.json'
 USED_KEYWORDS_FILE = 'used_keywords.txt'
 
 # Cargar stopwords en español
-STOPWORDS = set(stopwords.words('spanish'))
+# STOPWORDS = set(stopwords.words('spanish'))
+# Descargar las stopwords si no están disponibles
+try:
+    STOPWORDS = set(stopwords.words('spanish'))
+except LookupError:
+    logger.info("Stopwords no encontradas, descargando...")
+    nltk.download('stopwords')
+    STOPWORDS = set(stopwords.words('spanish'))
+
 
 def load_keywords_dict():
     logger.info("Cargando diccionario de keywords.")
