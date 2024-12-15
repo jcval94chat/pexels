@@ -122,6 +122,41 @@ def obtener_videos(py_pexel, query, max_retries=3):
     logger.error(f"No se encontraron videos para '{query}' después de {max_retries} intentos.")
     return None
 
+# def download_vids(search_videos_page, videos_descargados, prefijo='', verbose=True):
+#     logger.info("Iniciando descarga de videos.")
+#     archvi = []
+#     nueva_info = False
+#     download_folder = './temp_videos'
+#     if not os.path.exists(download_folder):
+#         os.makedirs(download_folder, exist_ok=True)
+#         logger.info(f"Carpeta {download_folder} creada.")
+
+#     for i, video in enumerate(search_videos_page.entries):
+#         nombre_archivo = prefijo + video.url.split('/')[-2] + '.mp4'
+#         archvi.append(nombre_archivo)
+
+#         if nombre_archivo not in videos_descargados:
+#             if verbose:
+#                 logger.info(f'Descargando {nombre_archivo}')
+#             data_url = 'https://www.pexels.com/video/' + str(video.id) + '/download'
+#             r = requests.get(data_url)
+
+#             rcod = r.status_code
+#             if rcod >= 200 and rcod < 300:
+#                 file_path = os.path.join(download_folder, nombre_archivo)
+#                 with open(file_path, 'wb') as outfile:
+#                     outfile.write(r.content)
+#                 videos_descargados.add(nombre_archivo)
+#                 nueva_info = True
+#                 logger.info(f"Video {nombre_archivo} descargado correctamente en {file_path}.")
+#             else:
+#                 logger.warning(f"No se pudo descargar {nombre_archivo}. Código: {rcod}")
+
+#             time.sleep(5)
+
+#     logger.info("Descarga de videos finalizada.")
+#     return archvi, nueva_info
+
 def download_vids(search_videos_page, videos_descargados, prefijo='', verbose=True):
     logger.info("Iniciando descarga de videos.")
     archvi = []
@@ -132,17 +167,28 @@ def download_vids(search_videos_page, videos_descargados, prefijo='', verbose=Tr
         logger.info(f"Carpeta {download_folder} creada.")
 
     for i, video in enumerate(search_videos_page.entries):
+        # Obtener el nombre de archivo a partir de la URL del video
         nombre_archivo = prefijo + video.url.split('/')[-2] + '.mp4'
         archvi.append(nombre_archivo)
 
         if nombre_archivo not in videos_descargados:
             if verbose:
-                logger.info(f'Descargando {nombre_archivo}')
-            data_url = 'https://www.pexels.com/video/' + str(video.id) + '/download'
+                logger.info(f"Descargando {nombre_archivo}")
+
+            # Obtener la lista de archivos de video disponibles
+            video_files = video.video_files
+            if not video_files:
+                logger.warning(f"No se encontraron video_files para el video {video.id}")
+                continue
+
+            # Seleccionar uno, por ejemplo el primero
+            data_url = video_files[0]['link']
+
+            # Intentar descargar
             r = requests.get(data_url)
 
             rcod = r.status_code
-            if rcod >= 200 and rcod < 300:
+            if 200 <= rcod < 300:
                 file_path = os.path.join(download_folder, nombre_archivo)
                 with open(file_path, 'wb') as outfile:
                     outfile.write(r.content)
@@ -156,6 +202,9 @@ def download_vids(search_videos_page, videos_descargados, prefijo='', verbose=Tr
 
     logger.info("Descarga de videos finalizada.")
     return archvi, nueva_info
+
+
+
 
 logger.info("Iniciando proceso principal.")
 
