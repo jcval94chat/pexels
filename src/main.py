@@ -5,7 +5,7 @@ import requests
 import time
 import logging
 import traceback
-
+from nltk.corpus import stopwords
 from pypexels import PyPexels
 from google_drive import get_latest_doc_words, upload_files_to_drive
 from email_notify import send_email
@@ -48,6 +48,9 @@ except json.JSONDecodeError as e:
 KEYWORDS_DICT_FILE = 'keywords_dict.json'
 USED_KEYWORDS_FILE = 'used_keywords.txt'
 
+# Cargar stopwords en español
+STOPWORDS = set(stopwords.words('spanish'))
+
 def load_keywords_dict():
     logger.info("Cargando diccionario de keywords.")
     if os.path.exists(KEYWORDS_DICT_FILE):
@@ -60,7 +63,6 @@ def load_keywords_dict():
 
 def save_keywords_dict(keywords_dict, doc_name, last_10_words):
     logger.info("Guardando keywords_dict actualizado.")
-    # Mostrar qué nueva info se está agregando
     logger.info(f"Se agregan/actualizan las últimas 10 palabras para el documento '{doc_name}': {last_10_words}")
     with open(KEYWORDS_DICT_FILE, 'w', encoding='utf-8') as f:
         json.dump(keywords_dict, f, ensure_ascii=False, indent=4)
@@ -87,8 +89,13 @@ def save_used_keywords(used):
 
 def filter_new_keywords(all_keywords, used_keywords_set):
     logger.info("Filtrando nuevas palabras clave.")
-    new = [w for w in all_keywords if w not in used_keywords_set]
+    filtered = [w for w in all_keywords if w.lower() not in STOPWORDS]
+    new = [w for w in filtered if w not in used_keywords_set]
     logger.info(f"Se encontraron {len(new)} nuevas palabras clave: {new}")
+    old = [w for w in all_keywords if w in used_keywords_set]
+    logger.info(f"Estas palabras ya estaban usadas y se descartan: {old}")
+    discarded = [w for w in all_keywords if w.lower() in STOPWORDS]
+    logger.info(f"Estas palabras fueron descartadas por ser stopwords: {discarded}")
     return new
 
 def obtener_videos(py_pexel, query, max_retries=3):
@@ -166,24 +173,21 @@ try:
         logger.info("No hay palabras nuevas, no se descargan videos.")
         nueva_info = False
     else:
-        query = random.choice(new_keywords)
-        logger.info(f"Buscando videos con la palabra clave: {query}")
+        nueva_info = False
         py_pexel = PyPexels(api_key=API_KEY)
-
-        # Intentar obtener videos
-        search_videos_page = obtener_videos(py_pexel, query)
-        if search_videos_page is None:
-            logger.info("No se pudo encontrar ningún video tras reintentos, no hay nueva información.")
-            nueva_info = False
-        else:
-            # Descarga de videos
-            videos_descargados = set(used_keywords)
-            archivi, nueva_info = download_vids(search_videos_page, videos_descargados, prefijo='', verbose=True)
-
-            # Actualizar used_keywords con las nuevas palabras
-            for w in new_keywords:
-                used_keywords.add(w)
-            save_used_keywords(used_keywords)
+        for query in new_keywords:
+            logger.info(f"Buscando videos con la palabra clave: {query}")
+            search_videos_page = obtener_videos(py_pexel, query)
+            if search_videos_page is None:
+                logger.info(f"No se encontraron videos para '{query}' tras reintentos.")
+                continue
+            else:
+                videos_descargados = set(used_keywords)
+                archivi, info_descargada = download_vids(search_videos_page, videos_descargados, prefijo='', verbose=True)
+                if info_descargada:
+                    used_keywords.add(query)
+                    nueva_info = True
+        save_used_keywords(used_keywords)
 
     # Subir o enviar correo
     if nueva_info:
