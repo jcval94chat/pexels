@@ -14,29 +14,39 @@ from email_notify import send_email
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
 
-# Crear formato de logging
 formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
 
-# Crear manejador para archivo
 file_handler = logging.FileHandler('youtube_data.log', mode='a')
 file_handler.setFormatter(formatter)
 logger.addHandler(file_handler)
 
-# Crear manejador para consola
 console_handler = logging.StreamHandler()
 console_handler.setFormatter(formatter)
 logger.addHandler(console_handler)
 
-# Cargar secretos desde variables de entorno
-DOCS_FOLDER_ID = os.environ.get("DOCS_FOLDER_ID")  # ID de la carpeta de Drive
-VIDEOS_FOLDER_ID = os.environ.get("VIDEOS_FOLDER_ID")  # ID de la carpeta de Drive
-RECIPIENT_EMAIL = os.environ.get("RECIPIENT_EMAIL")  # Email del destinatario
-API_KEY = os.environ.get("PEXELS_API_KEY")  # API key de Pexels
+# Cargar variables de entorno
+DOCS_FOLDER_ID = os.environ.get("DOCS_FOLDER_ID")           # ID de la carpeta de Drive para documentos
+VIDEOS_FOLDER_ID = os.environ.get("VIDEOS_FOLDER_ID")       # ID de la carpeta de Drive para videos
+RECIPIENT_EMAIL = os.environ.get("RECIPIENT_EMAIL")         # Email del destinatario
+API_KEY = os.environ.get("PEXELS_API_KEY")                  # API key de Pexels
+GCP_CREDENTIALS_ENV = os.environ.get("GCP_CREDENTIALS")     # Credenciales JSON de la cuenta de servicio
+
+# Validar que GCP_CREDENTIALS exista y no esté vacío
+if not GCP_CREDENTIALS_ENV:
+    logger.error("La variable de entorno GCP_CREDENTIALS no está definida o está vacía.")
+    exit(1)
+
+try:
+    # Comprobar que se puede cargar el JSON
+    creds_dict = json.loads(GCP_CREDENTIALS_ENV)
+    logger.info("Credenciales GCP cargadas correctamente desde la variable de entorno.")
+except json.JSONDecodeError as e:
+    logger.error(f"Error decodificando GCP_CREDENTIALS: {e}")
+    exit(1)
 
 # Archivos locales para mantener el historial
 KEYWORDS_DICT_FILE = 'keywords_dict.json'
 USED_KEYWORDS_FILE = 'used_keywords.txt'
-CREDENTIALS_FILE = 'credentials.json'  # Descargado desde el secreto GCP_CREDENTIALS
 
 def load_keywords_dict():
     logger.info("Cargando diccionario de keywords.")
@@ -89,7 +99,7 @@ def download_vids(search_videos_page, videos_descargados, prefijo='', verbose=Tr
         logger.info(f"Carpeta {download_folder} creada.")
 
     for i, video in enumerate(search_videos_page.entries):
-        nombre_archivo = prefijo+video.url.split('/')[-2] +'.mp4'
+        nombre_archivo = prefijo + video.url.split('/')[-2] + '.mp4'
         archvi.append(nombre_archivo)
 
         if nombre_archivo not in videos_descargados:
@@ -112,24 +122,14 @@ def download_vids(search_videos_page, videos_descargados, prefijo='', verbose=Tr
                 logger.warning(f"No se pudo descargar {nombre_archivo}. Código: {rcod}, Tipo: {tipo_archivo}")
 
             time.sleep(5)
-    
+
     logger.info("Descarga de videos finalizada.")
     return archvi, nueva_info
 
-# --- LÓGICA PRINCIPAL ---
 logger.info("Iniciando proceso principal.")
 
-
-if os.path.exists(CREDENTIALS_FILE):
-    logger.info(f"El archivo de credenciales existe en la ruta: {CREDENTIALS_FILE}")
-    with open(CREDENTIALS_FILE, 'r') as f:
-        logger.info(f"Contenido de credentials.json: {f.read()[:100]}...")  # Muestra los primeros 100 caracteres
-else:
-    logger.error("El archivo de credenciales no existe.")
-    exit(1)
-
 try:
-    doc_name, last_10_words = get_latest_doc_words(DOCS_FOLDER_ID, CREDENTIALS_FILE)
+    doc_name, last_10_words = get_latest_doc_words(DOCS_FOLDER_ID, GCP_CREDENTIALS_ENV)
     if doc_name is None:
         logger.info("No se encontraron documentos, se termina el proceso.")
         exit(0)
@@ -159,6 +159,7 @@ try:
         videos_descargados = set(used_keywords)
         archivi, nueva_info = download_vids(search_videos_page, videos_descargados, prefijo='', verbose=True)
 
+        # Actualizar used_keywords con las nuevas palabras
         for w in new_keywords:
             used_keywords.add(w)
         save_used_keywords(used_keywords)
@@ -167,7 +168,7 @@ try:
     if nueva_info:
         logger.info("Se encontraron nuevos videos, intentando subir a Drive.")
         try:
-            upload_files_to_drive('./temp_videos', VIDEOS_FOLDER_ID, CREDENTIALS_FILE)
+            upload_files_to_drive('./temp_videos', VIDEOS_FOLDER_ID, GCP_CREDENTIALS_ENV)
         except Exception as e:
             logger.error(f"No se pudo subir a Drive: {e}")
             traceback.print_exc()
