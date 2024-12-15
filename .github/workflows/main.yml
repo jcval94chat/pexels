@@ -1,0 +1,28 @@
+name: Run Video Workflow
+
+on:
+  workflow_dispatch: # Permite ejecutar manualmente el workflow desde la interfaz de GitHub
+
+jobs:
+  run-workflow:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v2
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+
+      - name: Install dependencies
+        run: |
+          pip install -r src/requirements.txt
+
+      - name: Setup Google credentials
+        run: |
+          echo "$GCP_CREDENTIALS" > credentials.json
+
+      - name: Run main script
+        run: |
+          python src/main.py
