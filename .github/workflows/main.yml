@@ -3,7 +3,7 @@ name: Run Video Workflow
 on:
   workflow_dispatch:
   schedule:
-    - cron: '0 0 * * *' # todos los días a medianoche, por ejemplo
+    - cron: '0 0 * * *'
 
 jobs:
   run-workflow:
@@ -21,11 +21,15 @@ jobs:
         run: |
           pip install -r src/requirements.txt
 
-      - name: Decode and save GCP credentials
-        run: |
-          echo ${{secrets.GCP_CREDENTIALS}} | base64 --decode > credentials.json
-
       - name: Run main script
+        env:
+          DOCS_FOLDER_ID: ${{ secrets.DOCS_FOLDER_ID }}
+          VIDEOS_FOLDER_ID: ${{ secrets.VIDEOS_FOLDER_ID }}
+          RECIPIENT_EMAIL: ${{ secrets.RECIPIENT_EMAIL }}
+          PEXELS_API_KEY: ${{ secrets.PEXELS_API_KEY }}
+          GCP_CREDENTIALS: ${{ secrets.GCP_CREDENTIALS }}
+          GMAIL_USER: ${{ secrets.GMAIL_USER }}
+          GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
         run: |
           python src/main.py
 
