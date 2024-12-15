@@ -8,7 +8,8 @@ from google_drive import get_latest_doc_words, upload_files_to_drive
 from email_notify import send_email
 
 # Cargar secretos desde variables de entorno
-DRIVE_FOLDER_ID = os.environ.get("DRIVE_FOLDER_ID")  # ID de la carpeta de Drive
+DOCS_FOLDER_ID = os.environ.get("DOCS_FOLDER_ID")  # ID de la carpeta de Drive
+VIDEOS_FOLDER_ID = os.environ.get("VIDEOS_FOLDER_ID")  # ID de la carpeta de Drive
 RECIPIENT_EMAIL = os.environ.get("RECIPIENT_EMAIL")  # Email del destinatario
 API_KEY = os.environ.get("PEXELS_API_KEY")  # API key de Pexels
 
@@ -76,7 +77,7 @@ def download_vids(search_videos_page, videos_descargados, prefijo='', verbose=Tr
 
 # --- LÓGICA PRINCIPAL ---
 # 1. Obtener las últimas 10 palabras del doc más reciente en la carpeta de Drive
-doc_name, last_10_words = get_latest_doc_words(DRIVE_FOLDER_ID, CREDENTIALS_FILE)
+doc_name, last_10_words = get_latest_doc_words(DOCS_FOLDER_ID, CREDENTIALS_FILE)
 if doc_name is None:
     print("No se encontraron documentos, no se hace nada.")
     exit(0)
@@ -114,7 +115,7 @@ else:
 if nueva_info:
     try:
         # Subir videos a Drive
-        upload_files_to_drive('./temp_videos', DRIVE_FOLDER_ID, CREDENTIALS_FILE)
+        upload_files_to_drive('./temp_videos', VIDEOS_FOLDER_ID, CREDENTIALS_FILE)
     except Exception as e:
         print(f"No se pudo subir a Drive: {e}")
         send_email(RECIPIENT_EMAIL, "Información lista en el repositorio", "Hubo un problema subiendo a Drive. Verifique el repositorio.")
