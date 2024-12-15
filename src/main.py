@@ -119,6 +119,15 @@ def download_vids(search_videos_page, videos_descargados, prefijo='', verbose=Tr
 # --- LÓGICA PRINCIPAL ---
 logger.info("Iniciando proceso principal.")
 
+
+if os.path.exists(CREDENTIALS_FILE):
+    logger.info(f"El archivo de credenciales existe en la ruta: {CREDENTIALS_FILE}")
+    with open(CREDENTIALS_FILE, 'r') as f:
+        logger.info(f"Contenido de credentials.json: {f.read()[:100]}...")  # Muestra los primeros 100 caracteres
+else:
+    logger.error("El archivo de credenciales no existe.")
+    exit(1)
+
 try:
     doc_name, last_10_words = get_latest_doc_words(DOCS_FOLDER_ID, CREDENTIALS_FILE)
     if doc_name is None:
