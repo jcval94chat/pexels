@@ -109,9 +109,9 @@ def download_vids(search_videos_page, videos_descargados, prefijo='', verbose=Tr
             r = requests.get(data_url)
 
             rcod = r.status_code
-            tipo_archivo = r.headers.get('content-type')
+            # tipo_archivo = r.headers.get('content-type')
 
-            if rcod >= 200 and rcod < 300 and 'mp4' in tipo_archivo:
+            if rcod >= 200 and rcod < 300:
                 file_path = os.path.join(download_folder, nombre_archivo)
                 with open(file_path, 'wb') as outfile:
                     outfile.write(r.content)
