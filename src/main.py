@@ -119,7 +119,7 @@ def download_vids(search_videos_page, videos_descargados, prefijo='', verbose=Tr
                 nueva_info = True
                 logger.info(f"Video {nombre_archivo} descargado correctamente en {file_path}.")
             else:
-                logger.warning(f"No se pudo descargar {nombre_archivo}. Código: {rcod}, Tipo: {tipo_archivo}")
+                logger.warning(f"No se pudo descargar {nombre_archivo}. Código: {rcod}")
 
             time.sleep(5)
 
