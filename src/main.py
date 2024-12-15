@@ -58,8 +58,10 @@ def load_keywords_dict():
     logger.info("No existe keywords_dict.json, se retorna diccionario vacío.")
     return {}
 
-def save_keywords_dict(keywords_dict):
+def save_keywords_dict(keywords_dict, doc_name, last_10_words):
     logger.info("Guardando keywords_dict actualizado.")
+    # Mostrar qué nueva info se está agregando
+    logger.info(f"Se agregan/actualizan las últimas 10 palabras para el documento '{doc_name}': {last_10_words}")
     with open(KEYWORDS_DICT_FILE, 'w', encoding='utf-8') as f:
         json.dump(keywords_dict, f, ensure_ascii=False, indent=4)
     logger.info("keywords_dict guardado correctamente.")
@@ -86,8 +88,24 @@ def save_used_keywords(used):
 def filter_new_keywords(all_keywords, used_keywords_set):
     logger.info("Filtrando nuevas palabras clave.")
     new = [w for w in all_keywords if w not in used_keywords_set]
-    logger.info(f"Se encontraron {len(new)} nuevas palabras clave.")
+    logger.info(f"Se encontraron {len(new)} nuevas palabras clave: {new}")
     return new
+
+def obtener_videos(py_pexel, query, max_retries=3):
+    retries = 0
+    while retries < max_retries:
+        page = random.randint(1,4)
+        search_videos_page = py_pexel.videos_search(query=query, page=page, per_page=4)
+        entries = list(search_videos_page.entries)
+        if len(entries) == 0:
+            logger.warning(f"No se encontraron videos para '{query}' en la página {page}. Reintentando...")
+            retries += 1
+            time.sleep(2)
+        else:
+            logger.info(f"Se encontraron {len(entries)} videos para '{query}' en la página {page}.")
+            return search_videos_page
+    logger.error(f"No se encontraron videos para '{query}' después de {max_retries} intentos.")
+    return None
 
 def download_vids(search_videos_page, videos_descargados, prefijo='', verbose=True):
     logger.info("Iniciando descarga de videos.")
@@ -109,8 +127,6 @@ def download_vids(search_videos_page, videos_descargados, prefijo='', verbose=Tr
             r = requests.get(data_url)
 
             rcod = r.status_code
-            # tipo_archivo = r.headers.get('content-type')
-
             if rcod >= 200 and rcod < 300:
                 file_path = os.path.join(download_folder, nombre_archivo)
                 with open(file_path, 'wb') as outfile:
@@ -141,7 +157,7 @@ try:
 
     # Actualizar keywords_dict con el doc actual
     keywords_dict[doc_name] = last_10_words
-    save_keywords_dict(keywords_dict)
+    save_keywords_dict(keywords_dict, doc_name, last_10_words)
 
     # Filtrar nuevas palabras
     new_keywords = filter_new_keywords(last_10_words, used_keywords)
@@ -153,16 +169,21 @@ try:
         query = random.choice(new_keywords)
         logger.info(f"Buscando videos con la palabra clave: {query}")
         py_pexel = PyPexels(api_key=API_KEY)
-        search_videos_page = py_pexel.videos_search(query=query, page=random.randint(1,4), per_page=4)
 
-        # Descarga de videos
-        videos_descargados = set(used_keywords)
-        archivi, nueva_info = download_vids(search_videos_page, videos_descargados, prefijo='', verbose=True)
+        # Intentar obtener videos
+        search_videos_page = obtener_videos(py_pexel, query)
+        if search_videos_page is None:
+            logger.info("No se pudo encontrar ningún video tras reintentos, no hay nueva información.")
+            nueva_info = False
+        else:
+            # Descarga de videos
+            videos_descargados = set(used_keywords)
+            archivi, nueva_info = download_vids(search_videos_page, videos_descargados, prefijo='', verbose=True)
 
-        # Actualizar used_keywords con las nuevas palabras
-        for w in new_keywords:
-            used_keywords.add(w)
-        save_used_keywords(used_keywords)
+            # Actualizar used_keywords con las nuevas palabras
+            for w in new_keywords:
+                used_keywords.add(w)
+            save_used_keywords(used_keywords)
 
     # Subir o enviar correo
     if nueva_info:
