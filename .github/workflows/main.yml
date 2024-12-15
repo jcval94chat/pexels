@@ -30,6 +30,10 @@ jobs:
         run: |
           pip install -r src/requirements.txt
 
+      - name: Download NLTK data
+        run: |
+          python -m nltk.downloader stopwords
+
       # Ejecutar el script principal
       - name: Run main script
         env:
