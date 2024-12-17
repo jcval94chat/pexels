@@ -2,11 +2,23 @@ from googleapiclient.discovery import build
 from google.oauth2 import service_account
 from googleapiclient.http import MediaFileUpload
 import os
+import io
 import json
 import logging
 import traceback
 
 logger = logging.getLogger()
+
+def get_drive_service(creds_env):
+    creds_dict = json.loads(creds_env)
+    # MODIFICACIÓN: Ajustar uso a service_account.Credentials (no se había definido Credentials antes)
+    creds = service_account.Credentials.from_service_account_info(
+        creds_dict, 
+        scopes=["https://www.googleapis.com/auth/drive"]
+    )
+    service = build('drive', 'v3', credentials=creds)
+    return service
+
 
 def get_latest_doc_words(drive_folder_id, creds_env):
     try:
@@ -77,3 +89,30 @@ def upload_files_to_drive(local_path, drive_folder_id, creds_env):
         logger.error(f"Error al subir archivos a Drive: {e}")
         traceback.print_exc()
         raise e
+
+# MODIFICACIÓN: Nueva función para listar archivos en la carpeta de Drive
+def list_files_in_folder(folder_id, creds_env):
+    logger.info(f"Listando archivos en la carpeta de Drive con ID: {folder_id}")
+    creds_info = json.loads(creds_env)
+    creds = service_account.Credentials.from_service_account_info(
+        creds_info, 
+        scopes=["https://www.googleapis.com/auth/drive"]
+    )
+    drive_service = build('drive', 'v3', credentials=creds)
+
+    files_in_folder = []
+    page_token = None
+    while True:
+        response = drive_service.files().list(
+            q=f"'{folder_id}' in parents and trashed=false",
+            fields="nextPageToken, files(id, name)",
+            pageToken=page_token
+        ).execute()
+        for file in response.get('files', []):
+            files_in_folder.append(file['name'])
+        page_token = response.get('nextPageToken', None)
+        if page_token is None:
+            break
+
+    logger.info(f"Archivos encontrados en la carpeta: {files_in_folder}")
+    return set(files_in_folder)
