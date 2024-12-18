@@ -22,6 +22,10 @@ if not GCP_CREDENTIALS_ENV:
     logger.error("La variable de entorno GCP_CREDENTIALS no está definida o está vacía.")
     exit(1)
 
+if not VIDEOS_FOLDER_ID:
+    logger.error("La variable de entorno VIDEOS_FOLDER_ID no está definida o está vacía.")
+    exit(1)
+
 def get_drive_service(creds_env):
     creds_info = json.loads(creds_env)
     creds = Credentials.from_service_account_info(creds_info, scopes=["https://www.googleapis.com/auth/drive"])
@@ -59,7 +63,8 @@ def create_folder(service, name, parent_id=None):
 def search_videos_by_keyword(service, folder_id, keyword):
     # Busca archivos en folder_id cuyo nombre contenga 'keyword' (insensible a mayúsculas).
     # Ajustar la consulta si se requiere otro criterio.
-    query = f"'{folder_id}' in parents and trashed=false and name contains '{keyword}'"
+    # Para insensibilidad a mayúsculas, utilizamos la función LOWER en la consulta
+    query = f"'{folder_id}' in parents and trashed=false and contains(name, '{keyword}')"
     result = service.files().list(q=query, fields="files(id, name)").execute()
     files = result.get('files', [])
     return files
@@ -78,8 +83,10 @@ def download_file(service, file_id, destination_path):
     fh = BytesIO()
     downloader = MediaIoBaseDownload(fh, request)
     done = False
-    while done is False:
+    while not done:
         status, done = downloader.next_chunk()
+        if status:
+            logger.info(f"Descargando {destination_path}: {int(status.progress() * 100)}%")
     with open(destination_path, 'wb') as f:
         f.write(fh.getbuffer())
     logger.info(f"Archivo descargado en {destination_path}")
@@ -104,10 +111,6 @@ def zip_folder(folder_path, zip_path):
     logger.info(f"Carpeta {folder_path} comprimida en {zip_path}")
 
 def main():
-    if not VIDEOS_FOLDER_ID:
-        logger.error("La variable de entorno VIDEOS_FOLDER_ID no está definida.")
-        return
-
     # Cargar keywords_dict.json
     KEYWORDS_DICT_FILE = 'keywords_dict.json'
     if not os.path.exists(KEYWORDS_DICT_FILE):
@@ -117,56 +120,64 @@ def main():
     with open(KEYWORDS_DICT_FILE, 'r', encoding='utf-8') as f:
         keywords_dict = json.load(f)
 
+    if not keywords_dict:
+        logger.info("keywords_dict.json está vacío. No hay acciones a realizar.")
+        return
+
+    # Obtener el último key del diccionario
+    last_key = list(keywords_dict.keys())[-1]
+    last_word_list = keywords_dict[last_key]
+    logger.info(f"Procesando el último key: '{last_key}' con palabras clave: {last_word_list}")
+
     service = get_drive_service(GCP_CREDENTIALS_ENV)
 
-    # Directorio temporal local
-    temp_base = './temp_archives'
+    # Crear carpeta en Drive con el nombre del último key
+    doc_folder_id = create_folder(service, last_key)
+
+    # Por cada palabra en last_word_list, buscar hasta 4 videos que la contengan en su nombre y copiarlos
+    for w in last_word_list:
+        logger.info(f"Buscando videos con la palabra clave: '{w}'")
+        found_videos = search_videos_by_keyword(service, VIDEOS_FOLDER_ID, w)
+        # Tomar hasta 4
+        videos_to_copy = found_videos[:4]
+        if not videos_to_copy:
+            logger.info(f"No se encontraron videos para la palabra clave: '{w}'")
+            continue
+        for vid in videos_to_copy:
+            copy_file(service, vid['id'], vid['name'], doc_folder_id)
+
+    # Descargar los archivos de la carpeta recién creada
+    doc_files = list_files_in_folder(service, doc_folder_id)
+    if not doc_files:
+        logger.info(f"No hay archivos en la carpeta '{last_key}' para comprimir.")
+        return
+
+    temp_base = './temp_archive'
     if os.path.exists(temp_base):
         shutil.rmtree(temp_base)
     os.makedirs(temp_base, exist_ok=True)
 
-    # Por cada key en keywords_dict, creamos una carpeta en Drive
-    for doc_name, word_list in keywords_dict.items():
-        # Crear carpeta en Drive con el nombre doc_name
-        doc_folder_id = create_folder(service, doc_name)
+    doc_local_folder = os.path.join(temp_base, last_key)
+    os.makedirs(doc_local_folder, exist_ok=True)
 
-        # Por cada palabra en word_list, buscamos hasta 4 videos que la contengan en su nombre
-        # y los copiamos a la carpeta doc_folder_id
-        for w in word_list:
-            # Buscar archivos en VIDEOS_FOLDER_ID que contengan w
-            found_videos = search_videos_by_keyword(service, VIDEOS_FOLDER_ID, w)
-            # Tomar hasta 4
-            videos_to_copy = found_videos[:4]
-            for vid in videos_to_copy:
-                # Copiar archivo
-                copy_file(service, vid['id'], vid['name'], doc_folder_id)
+    for fobj in doc_files:
+        local_file_path = os.path.join(doc_local_folder, fobj['name'])
+        download_file(service, fobj['id'], local_file_path)
 
-        # Una vez copiados, descargamos el contenido de la carpeta doc_folder_id, lo comprimimos
-        # y subimos el zip a la misma carpeta.
-        doc_local_folder = os.path.join(temp_base, doc_name)
-        os.makedirs(doc_local_folder, exist_ok=True)
+    # Crear zip local
+    zip_path = os.path.join(temp_base, f"{last_key}.zip")
+    zip_folder(doc_local_folder, zip_path)
 
-        # Listar archivos en la carpeta doc_folder_id
-        doc_files = list_files_in_folder(service, doc_folder_id)
-        # Descargar todos los archivos (asumiendo que son videos)
-        for fobj in doc_files:
-            local_file_path = os.path.join(doc_local_folder, fobj['name'])
-            download_file(service, fobj['id'], local_file_path)
+    # Subir el zip a la carpeta doc_folder_id
+    upload_file(service, zip_path, doc_folder_id)
 
-        # Crear zip local
-        zip_path = os.path.join(temp_base, f"{doc_name}.zip")
-        zip_folder(doc_local_folder, zip_path)
-
-        # Subir el zip a la carpeta doc_folder_id
-        upload_file(service, zip_path, doc_folder_id)
-
-        # Opcional: limpiar archivos locales de esa carpeta
-        shutil.rmtree(doc_local_folder)
-        if os.path.exists(zip_path):
-            os.remove(zip_path)
-
-    # Opcional: limpiar el directorio temporal base
+    # Limpiar archivos locales
+    shutil.rmtree(doc_local_folder)
+    if os.path.exists(zip_path):
+        os.remove(zip_path)
     shutil.rmtree(temp_base)
+
+    logger.info(f"Archivo ZIP para '{last_key}' creado y subido exitosamente.")
 
 if __name__ == "__main__":
     main()
