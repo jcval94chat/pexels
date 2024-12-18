@@ -30,6 +30,7 @@ jobs:
         run: |
           pip install -r src/requirements.txt
 
+      # Descargar datos de NLTK
       - name: Download NLTK data
         run: |
           python -m nltk.downloader stopwords
@@ -53,7 +54,7 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
 
-      # Realizar commit de los cambios
+      # Realizar commit de los cambios en keywords_dict.json
       - name: Commit changes
         run: |
           git add keywords_dict.json
@@ -65,6 +66,14 @@ jobs:
           git push
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # Ejecutar el nuevo script para generar archivos ZIP en Drive
+      - name: Run generate_video_archives script
+        env:
+          GCP_CREDENTIALS: ${{ secrets.GCP_CREDENTIALS }}
+          VIDEOS_FOLDER_ID: ${{ secrets.VIDEOS_FOLDER_ID }}
+        run: |
+          python src/generate_video_archives.py
 
       # Subir los logs como artefacto
       - name: Upload logs
