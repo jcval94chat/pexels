@@ -126,6 +126,51 @@ def obtener_videos(py_pexel, query, max_retries=3):
     logger.error(f"No se encontraron videos para '{query}' después de {max_retries} intentos.")
     return None
 
+# def download_vids(search_videos_page, videos_en_drive, query, prefijo='', verbose=True):
+#     logger.info("Iniciando descarga de videos.")
+#     archvi = []
+#     nueva_info = False
+#     download_folder = './temp_videos'
+#     if not os.path.exists(download_folder):
+#         os.makedirs(download_folder, exist_ok=True)
+#         logger.info(f"Carpeta {download_folder} creada.")
+
+#     for i, video in enumerate(search_videos_page.entries):
+#         # Incluir el concepto en el nombre del archivo
+#         nombre_archivo = f"{prefijo}{query}_{video.url.split('/')[-2]}.mp4"
+#         archvi.append(nombre_archivo)
+
+#         # Verificar si ya existe en Drive
+#         if nombre_archivo in videos_en_drive:
+#             logger.info(f"El video {nombre_archivo} ya existe en Drive, se omite descarga.")
+#             continue
+
+#         if verbose:
+#             logger.info(f"Descargando {nombre_archivo}")
+
+#         video_files = video.video_files
+#         if not video_files:
+#             logger.warning(f"No se encontraron video_files para el video {video.id}")
+#             continue
+
+#         data_url = video_files[0]['link']
+#         r = requests.get(data_url)
+
+#         rcod = r.status_code
+#         if 200 <= rcod < 300:
+#             file_path = os.path.join(download_folder, nombre_archivo)
+#             with open(file_path, 'wb') as outfile:
+#                 outfile.write(r.content)
+#             nueva_info = True
+#             logger.info(f"Video {nombre_archivo} descargado correctamente en {file_path}.")
+#         else:
+#             logger.warning(f"No se pudo descargar {nombre_archivo}. Código: {rcod}")
+
+#         time.sleep(5)
+
+#     logger.info("Descarga de videos finalizada.")
+#     return archvi, nueva_info
+
 def download_vids(search_videos_page, videos_en_drive, query, prefijo='', verbose=True):
     logger.info("Iniciando descarga de videos.")
     archvi = []
@@ -136,8 +181,19 @@ def download_vids(search_videos_page, videos_en_drive, query, prefijo='', verbos
         logger.info(f"Carpeta {download_folder} creada.")
 
     for i, video in enumerate(search_videos_page.entries):
-        # Incluir el concepto en el nombre del archivo
-        nombre_archivo = f"{prefijo}{query}_{video.url.split('/')[-2]}.mp4"
+        # Obtener la mejor calidad disponible (asumiendo el primer archivo como el de mayor calidad)
+        video_files = video.video_files
+        if not video_files:
+            logger.warning(f"No se encontraron video_files para el video {video.id}")
+            continue
+
+        # Seleccionar el primer archivo de video como el más representativo
+        best_file = video_files[0]
+        resolution = f"{best_file['width']}x{best_file['height']}"
+        orientation = "VERTICAL" if best_file['height'] > best_file['width'] else "HORIZONTAL"
+
+        # Incluir el concepto, resolución y orientación en el nombre del archivo
+        nombre_archivo = f"{prefijo}{query}_{resolution}_{orientation}_{video.url.split('/')[-2]}.mp4"
         archvi.append(nombre_archivo)
 
         # Verificar si ya existe en Drive
@@ -148,12 +204,8 @@ def download_vids(search_videos_page, videos_en_drive, query, prefijo='', verbos
         if verbose:
             logger.info(f"Descargando {nombre_archivo}")
 
-        video_files = video.video_files
-        if not video_files:
-            logger.warning(f"No se encontraron video_files para el video {video.id}")
-            continue
-
-        data_url = video_files[0]['link']
+        # Descargar el archivo
+        data_url = best_file['link']
         r = requests.get(data_url)
 
         rcod = r.status_code
