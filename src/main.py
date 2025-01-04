@@ -263,16 +263,20 @@ try:
         videos_en_drive = list_files_in_folder(VIDEOS_FOLDER_ID, GCP_CREDENTIALS_ENV)
 
         for query in filtered_new_keywords:
-            logger.info(f"Buscando videos con la palabra clave: {query}")
-            search_videos_page = obtener_videos(py_pexel, query)
-            if search_videos_page is None:
-                logger.info(f"No se encontraron videos para '{query}' tras reintentos.")
+            try:
+                logger.info(f"Buscando videos con la palabra clave: {query}")
+                search_videos_page = obtener_videos(py_pexel, query)
+                if search_videos_page is None:
+                    logger.info(f"No se encontraron videos para '{query}' tras reintentos.")
+                    continue
+                else:
+                    archivi, info_descargada = download_vids(search_videos_page, videos_en_drive, query, prefijo='', verbose=True)
+                    if info_descargada:
+                        used_keywords.add(query)
+                        nueva_info = True
+            except Exception as e::
+                logger.error(f"Se obtuvo un error con la palabra clave: {query}, con el error {e}")
                 continue
-            else:
-                archivi, info_descargada = download_vids(search_videos_page, videos_en_drive, query, prefijo='', verbose=True)
-                if info_descargada:
-                    used_keywords.add(query)
-                    nueva_info = True
 
         save_used_keywords(used_keywords)
 
